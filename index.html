@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saber的待办清单</title>
+    
+    <!-- PWA配置 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ff6f61">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+    
+    <style>
+        body {
+            font-family: 'Comic Sans MS', '幼圆', cursive;
+            background: linear-gradient(135deg, #fff1eb 0%, #ace0f9 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            color: #ff6f61;
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 25px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-input {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .task-input input, .task-input select, .task-input button {
+            padding: 12px;
+            border: 2px solid #ff6f61;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .task-input button {
+            background: #ff6f61;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .task-input button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(255, 111, 97, 0.4);
+        }
+
+        .task-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 12px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .task-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-content {
+            flex-grow: 1;
+            margin: 0 15px;
+        }
+
+        .task-actions button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .complete-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .delete-btn {
+            background: #ff4444;
+            color: white;
+        }
+
+        .completed {
+            background: #f8f8f8;
+            opacity: 0.7;
+        }
+
+        .completed .task-content {
+            text-decoration: line-through;
+        }
+
+        .priority-tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .high-priority { background: #ffcccc; color: #cc0000; }
+        .medium-priority { background: #fff3cd; color: #856404; }
+        .low-priority { background: #d4edda; color: #155724; }
+
+        .progress-bar {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6f61, #ff9a9e);
+            transition: width 0.5s ease;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 111, 97, 0.1);
+            border-radius: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .task-input {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐾 Saber的待办清单 ✨</h1>
+        
+        <div class="stats">
+            <div>📝 总任务: <span id="total-tasks">0</span></div>
+            <div>✅ 已完成: <span id="completed-tasks">0</span></div>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress" style="width: 0%"></div>
+        </div>
+
+        <div class="task-input">
+            <input type="text" id="task-input" placeholder="📝 添加新任务...">
+            <div style="display: flex; gap: 10px;">
+                <select id="priority-select">
+                    <option value="high">🔥 高优先级</option>
+                    <option value="medium">🌤️ 中优先级</option>
+                    <option value="low">🌱 低优先级</option>
+                </select>
+                <button onclick="addTask()">✨ 添加任务</button>
+            </div>
+        </div>
+
+        <ul class="task-list" id="task-list"></ul>
+    </div>
+
+    <script>
+        // 本地存储功能
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        
+        // 初始化渲染
+        function renderTasks() {
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+            
+            tasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                li.className = `task-item ${task.completed ? 'completed' : ''}`;
+                li.innerHTML = `
+                    <input type="checkbox" ${task.completed ? 'checked' : ''} 
+                           onchange="toggleComplete(${index})">
+                    <div class="task-content">
+                        ${task.text}
+                        <span class="priority-tag ${task.priority}-priority">
+                            ${getPriorityLabel(task.priority)}
+                        </span>
+                    </div>
+                    <div class="task-actions">
+                        <button class="delete-btn" onclick="deleteTask(${index})">🗑️ 删除</button>
+                    </div>
+                `;
+                taskList.appendChild(li);
+            });
+
+            updateStats();
+            updateProgress();
+            saveToLocalStorage();
+        }
+
+        // 添加新任务
+        function addTask() {
+            const input = document.getElementById('task-input');
+            const text = input.value.trim();
+            const priority = document.getElementById('priority-select').value;
+            
+            if (text) {
+                tasks.push({
+                    text: text,
+                    priority: priority,
+                    completed: false,
+                    timestamp: new Date().toISOString()
+                });
+                
+                input.value = '';
+                renderTasks();
+            }
+        }
+
+        // 删除任务
+        function deleteTask(index) {
+            tasks.splice(index, 1);
+            renderTasks();
+        }
+
+        // 切换完成状态
+        function toggleComplete(index) {
+            tasks[index].completed = !tasks[index].completed;
+            renderTasks();
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            document.getElementById('total-tasks').textContent = tasks.length;
+            document.getElementById('completed-tasks').textContent = 
+                tasks.filter(t => t.completed).length;
+        }
+
+        // 更新进度条
+        function updateProgress() {
+            const completed = tasks.filter(t => t.completed).length;
+            const progress = tasks.length ? (completed / tasks.length * 100) : 0;
+            document.querySelector('.progress').style.width = `${progress}%`;
+        }
+
+        // 本地存储
+        function saveToLocalStorage() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        // 辅助函数
+        function getPriorityLabel(priority) {
+            return {
+                high: '🔥 重要',
+                medium: '🌤️ 一般',
+                low: '🌱 轻松'
+            }[priority];
+        }
+
+        // 初始化
+        renderTasks();
+
+        // 离线功能检测
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+
+        function updateNetworkStatus() {
+            if (!navigator.onLine) {
+                alert('⚠️ 当前处于离线状态，数据将保存到本地');
+            }
+        }
+    </script>
+
+    <!-- PWA Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker 注册成功');
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker 注册失败: ', err);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
